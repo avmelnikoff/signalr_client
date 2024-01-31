@@ -59,6 +59,7 @@ class WebSocketTransport implements ITransport {
     url = url!.replaceFirst('http', 'ws');
     
     MessageHeaders headers = MessageHeaders();
+    headers.addMessageHeaders(_options.headers);
 
     if (_options.cookies != null) {
       final cookieHeader = headers.getHeaderValue(HttpHeaders.cookieHeader);
