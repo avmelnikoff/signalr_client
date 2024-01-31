@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart';
 
+import 'cookie_manager.dart';
 import 'ihub_protocol.dart';
 import 'itransport.dart';
 import 'signalr_http_client.dart';
@@ -27,6 +28,9 @@ class HttpConnectionOptions {
   /// A MessageHeaders that provides default headers for HTTP Requests
   MessageHeaders? headers;
 
+  /// A CookieManager that provides cookie managements for HTTP Requests
+  AbstractCookieManager? cookies;
+
   /// A boolean indicating if message content should be logged.
   ///
   /// Message content can contain sensitive user data, so this is disabled by default.
@@ -49,6 +53,7 @@ class HttpConnectionOptions {
       Logger? logger,
       AccessTokenFactory? accessTokenFactory,
       MessageHeaders? headers,
+      AbstractCookieManager? cookies,
       bool logMessageContent = false,
       bool skipNegotiation = false,
       int requestTimeout = 2000})
@@ -57,6 +62,7 @@ class HttpConnectionOptions {
         this.logger = logger,
         this.accessTokenFactory = accessTokenFactory,
         this.headers = headers,
+        this.cookies = cookies,
         this.logMessageContent = logMessageContent,
         this.skipNegotiation = skipNegotiation,
         this.requestTimeout = requestTimeout;

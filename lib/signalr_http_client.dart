@@ -55,6 +55,12 @@ class SignalRHttpResponse {
   /// The status message of the response
   final String? statusText;
 
+  /// Response HTTP headers.
+  final Map<String, String> headers;
+
+  /// Options that was used for request.
+  final SignalRHttpRequest? requestOptions;
+
   /// May be a string (json) or an Uint8List (binary)
   final Object? content;
 
@@ -66,10 +72,16 @@ class SignalRHttpResponse {
   /// statusText: The status message of the response.
   /// content: The content of the response
   ///
-  SignalRHttpResponse(int statusCode,
-      {String? statusText = '', Object? content})
-      : this.statusCode = statusCode,
+  SignalRHttpResponse(
+    int statusCode, {
+    String? statusText = '',
+    SignalRHttpRequest? requestOptions,
+    Map<String, String>? headers,
+    Object? content,
+  })  : this.statusCode = statusCode,
         this.statusText = statusText,
+        this.requestOptions = requestOptions,
+        this.headers = headers ?? {},
         this.content = content;
 }
 

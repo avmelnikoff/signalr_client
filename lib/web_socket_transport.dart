@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:logging/logging.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'errors.dart';
+import 'http_connection_options.dart';
+import 'ihub_protocol.dart';
 import 'itransport.dart';
 import 'utils.dart';
 
@@ -12,7 +16,8 @@ class WebSocketTransport implements ITransport {
   // Properties
 
   Logger? _logger;
-  AccessTokenFactory? _accessTokenFactory;
+  // AccessTokenFactory? _accessTokenFactory;
+  HttpConnectionOptions _options;
   bool _logMessageContent;
   WebSocketChannel? _webSocket;
   StreamSubscription<Object?>? _webSocketListenSub;
@@ -24,9 +29,12 @@ class WebSocketTransport implements ITransport {
   OnReceive? onReceive;
 
   // Methods
-  WebSocketTransport(AccessTokenFactory? accessTokenFactory, Logger? logger,
-      bool logMessageContent)
-      : this._accessTokenFactory = accessTokenFactory,
+  WebSocketTransport(
+    // AccessTokenFactory? accessTokenFactory,
+    this._options,
+    Logger? logger,
+    bool logMessageContent,
+  )   : // this._accessTokenFactory = accessTokenFactory,
         this._logger = logger,
         this._logMessageContent = logMessageContent;
 
@@ -36,8 +44,8 @@ class WebSocketTransport implements ITransport {
 
     _logger?.finest("(WebSockets transport) Connecting");
 
-    if (_accessTokenFactory != null) {
-      final token = await _accessTokenFactory!();
+    if (_options.accessTokenFactory != null) {
+      final token = await _options.accessTokenFactory!();
       if (!isStringEmpty(token)) {
         final encodedToken = Uri.encodeComponent(token);
         url = url! +
@@ -49,8 +57,25 @@ class WebSocketTransport implements ITransport {
     var websocketCompleter = Completer();
     var opened = false;
     url = url!.replaceFirst('http', 'ws');
+    
+    MessageHeaders headers = MessageHeaders();
+
+    if (_options.cookies != null) {
+      final cookieHeader = headers.getHeaderValue(HttpHeaders.cookieHeader);
+      final newCookieHeader =
+          await _options.cookies!.getCookieHeader(url, cookieHeader);
+      if (newCookieHeader?.isNotEmpty ?? false) {
+        headers.setHeaderValue(HttpHeaders.cookieHeader, newCookieHeader!);
+      }
+    }
+
     _logger?.finest("WebSocket try connecting to '$url'.");
-    _webSocket = WebSocketChannel.connect(Uri.parse(url));
+    _logger?.finest("WebSocket connect headers ${headers.asMap}");
+
+    // _webSocket = WebSocketChannel.connect(Uri.parse(url));
+    _webSocket =
+        IOWebSocketChannel.connect(Uri.parse(url), headers: headers.asMap);
+
     opened = true;
     if (!websocketCompleter.isCompleted) websocketCompleter.complete();
     _logger?.info("WebSocket connected to '$url'.");

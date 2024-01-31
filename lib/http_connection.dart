@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:logging/logging.dart';
@@ -445,6 +446,15 @@ class HttpConnection implements IConnection {
       headers.setHeaderValue("Authorization", "Bearer $token");
     }
 
+    if (_options.cookies != null) {
+      final cookieHeader = headers.getHeaderValue(HttpHeaders.cookieHeader);
+      final newCookieHeader =
+          await _options.cookies!.getCookieHeader(url, cookieHeader);
+      if (newCookieHeader?.isNotEmpty ?? false) {
+        headers.setHeaderValue(HttpHeaders.cookieHeader, newCookieHeader!);
+      }
+    }
+
     final negotiateUrl = _resolveNegotiateUrl(url);
     _logger?.finer("Sending negotiation request: $negotiateUrl");
     try {
@@ -456,6 +466,8 @@ class HttpConnection implements IConnection {
         return Future.error(GeneralError(
             "Unexpected status code returned from negotiate ${response.statusCode}"));
       }
+
+      await _saveCookies(response);
 
       if (!(response.content is String)) {
         return Future.error(
@@ -475,6 +487,37 @@ class HttpConnection implements IConnection {
       _logger?.severe(
           "Failed to complete negotiation with the server: ${e.toString()}");
       return Future.error(e);
+    }
+  }
+
+  /// - `(?<=)` is a positive lookbehind assertion that matches a comma (",")
+  /// only if it's preceded by a specific pattern. In this case, the lookbehind
+  /// assertion is empty, which means it matches any comma that's preceded by any character.
+  /// - `(,)` captures the comma as a group.
+  /// - `(?=[^;]+?=)` is a positive lookahead assertion that matches a comma only
+  /// if it's followed by a specific pattern. In this case, it matches any comma
+  /// that's followed by one or more characters that are not semicolons (";") and
+  /// then an equals sign ("="). This ensures that the comma is not part of a cookie
+  /// attribute like "expires=Sun, 19 Feb 3000 01:43:15 GMT", which could also contain commas.
+  final _setCookieReg = RegExp('(?<=)(,)(?=[^;]+?=)');
+  
+  Future<void> _saveCookies(SignalRHttpResponse response) async {
+    final setCookies = response.headers[HttpHeaders.setCookieHeader];
+    if (setCookies == null || setCookies.isEmpty) {
+      return;
+    }
+
+    if (response.requestOptions?.url?.isNotEmpty ?? false) {
+      final List<Cookie> cookies = setCookies
+          .split(_setCookieReg)
+          // .expand((cookie) => cookie)
+          .where((cookie) => cookie.isNotEmpty)
+          .map((str) => Cookie.fromSetCookieValue(str))
+          .toList();
+      if (_options.cookies != null) {
+        await _options.cookies!
+            .setCookies(response.requestOptions!.url!, cookies);
+      }
     }
   }
 
@@ -555,8 +598,8 @@ class HttpConnection implements IConnection {
   ITransport _constructTransport(HttpTransportType transport) {
     switch (transport) {
       case HttpTransportType.WebSockets:
-        return WebSocketTransport(
-            _accessTokenFactory, _logger, _options.logMessageContent);
+        return WebSocketTransport(/*_accessTokenFactory,*/ _options, _logger,
+            _options.logMessageContent);
       case HttpTransportType.ServerSentEvents:
         return new ServerSentEventsTransport(_httpClient, _accessTokenFactory,
             _logger, _options.logMessageContent);
